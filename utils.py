@@ -13,6 +13,7 @@ def calc_time(fun):
         function: The decorated function.
 
     """
+
     def inner(*args, **kwargs):
         """
         Wrapper function that calculates the execution time of the decorated function.
@@ -29,7 +30,7 @@ def calc_time(fun):
         result = fun(*args, **kwargs)
         end_time = time.time()
 
-        if hasattr(args[0], 'debug') and getattr(args[0], 'debug'):
+        if hasattr(args[0], "debug") and getattr(args[0], "debug"):
             print(f'{"#" * 10} Time take by {fun.__name__}: {end_time - start_time}\n')
 
         return result
@@ -48,6 +49,7 @@ def handle_exception(fun):
         function: The decorated function.
 
     """
+
     def inner(*args, **kwargs):
         """
         Wrapper function that handles specific exceptions in the decorated function.
@@ -59,7 +61,7 @@ def handle_exception(fun):
         """
 
         try:
-            fun(*args, **kwargs)
+            return fun(*args, **kwargs)
         except exceptions.StaleElementReferenceException as e:
             """
             Exception handling for StaleElementReferenceException.
@@ -68,18 +70,14 @@ def handle_exception(fun):
                 e (exceptions.StaleElementReferenceException): The caught exception.
 
             """
-            print('\nError :: StaleElementReferenceException: ', e.msg)
+            print("\nError :: StaleElementReferenceException: ", e.msg)
         except KeyboardInterrupt:
             """
             Exception handling for KeyboardInterrupt.
 
             """
             pass
-        finally:
-            """
-            Cleanup operations.
 
-            """
-            args[0].web_driver.quit()
+        args[0].quit()
 
     return inner

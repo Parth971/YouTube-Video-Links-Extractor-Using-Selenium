@@ -1,175 +1,143 @@
-import pathlib
-import time
+import contextlib
 from bs4 import BeautifulSoup
-import json
-
-from selenium_web_driver import SeleniumWebDriver
 from selenium.webdriver.common.by import By
 
+from undetected_chromedriver import Chrome
+
+from selenium_web_driver import SeleniumWebDriverManager
 from utils import handle_exception, calc_time
 
 
-class YoutubeScraper(SeleniumWebDriver):
-    """
-    A class for scraping YouTube videos from a specific channel using Selenium WebDriver.
-
-    Attributes:
-        domain (str): The base domain for YouTube.
-        loading_time_limit (int): The wait time in seconds for new content to load.
-        debug (bool): Flag indicating whether to enable debug mode.
-
-    """
-    domain = 'https://www.youtube.com'
-    loading_time_limit = 2  # Wait for new content to load (in seconds)
+class YoutubeDetailsScraper(SeleniumWebDriverManager, Chrome):
     debug = True
 
     def __init__(self):
-        super(YoutubeScraper, self).__init__()
+        super().__init__(options=self.get_options(headless=False))
+        self.is_logged_in = False
+        self.result = {}
 
-    def scroll(self, target_height):
-        """
-        Scroll the web page to a specific height.
-
-        Args:
-            target_height (int): The target height to scroll to.
-
-        """
-        self.web_driver.execute_script(f"window.scrollTo(0, {target_height});")
-
-    @calc_time
-    def scroll_till_end(self):
-        """
-        Scroll the web page until reaching the end.
-
-        This method scrolls the page to the bottom and waits for new content to load,
-        repeating the process until no new content is loaded.
-
-        """
-        previous_height = 0
-        counter = 1
-
-        while True:
-            height = self.web_driver.execute_script(
-                "return document.documentElement.scrollHeight;")
-
-            self.scroll(target_height=height)
-
-            print(f'Loading new videos ({counter})...')
-
-            start_time = time.time()
-            while True:
-                new_height = self.web_driver.execute_script(
-                    "return document.documentElement.scrollHeight;")
-
-                if height != new_height:
-                    break
-
-                end_time = time.time()
-
-                if end_time - start_time > self.loading_time_limit:
-                    break
-
-            if previous_height == height:
-                print('\nLoaded all videos')
-                break
-
-            previous_height = height
-            counter += 1
-
-    @calc_time
-    def extract_links(self):
-        """
-        Extract video links from the loaded web page.
-
-        Returns:
-            list: A list of extracted video links.
-
-        """
-        html = self.web_driver.find_element(By.XPATH, 'html').get_attribute('innerHTML')
-        text = f"<html>{html}</html>"
-
-        self.web_driver.quit()
-
-        soup = BeautifulSoup(text, "html.parser")
-        links_xpath = 'div#contents ytd-rich-grid-row ytd-rich-item-renderer ytd-thumbnail a#thumbnail'
-        elements = soup.select(links_xpath)
-        print("soup.select('div#contents ytd-rich-grid-row')", len(soup.select('div#contents ytd-rich-grid-row')))
-        print(len(elements))
-        return [
-            element.attrs.get('href').split('=')[-1]
-            for element in elements
-        ]
-
-    @calc_time
-    def save_links(self, links):
-        """
-        Save the extracted video links to a JSON file.
-
-        Args:
-            links (list): A list of video links to be saved.
-
-        """
-        with open(BASE_DIR / 'links1.json', 'w') as fp:
-            json.dump(links, fp)
+    def __del__(self):
+        self.quit()
 
     @calc_time
     def open_link(self, link):
-        """
-        Open a specified link in the web driver.
+        self.get(url=link)
 
-        Args:
-            link (str): The link to be opened.
+    @calc_time
+    def extract_details(self) -> dict:
+        self.web_driver_wait_and_click(
+            by=By.CSS_SELECTOR,
+            value="yt-description-preview-view-model truncated-text > button",
+        )
 
-        """
-        self.web_driver.get(url=link)
+        have_email = False
+        with contextlib.suppress(Exception):
+            self.web_driver_wait_and_click(
+                by=By.XPATH,
+                value="//button[.//span[text()='View email address']]",
+            )
+            element = self.web_driver_wait_till_existence(
+                by=By.XPATH,
+                value="//iframe[@title='reCAPTCHA']",
+            )
+            self.switch_to.frame(element)
+            self.web_driver_wait_and_click(by=By.ID, value="recaptcha-anchor")
+            self.switch_to.default_content()
+            self.web_driver_wait_and_click(by=By.ID, value="submit-btn")
+            have_email = True
+
+        element = self.web_driver_wait_till_existence(
+            by=By.XPATH,
+            value="//*[@id='additional-info-container']/table",
+        )
+
+        try:
+            return self.get_info(
+                html=element.get_attribute("outerHTML"),
+                have_email=have_email,
+            )
+        except Exception:
+            return {"email": None, "location": None}
+
+    def get_info(self, html: str, have_email: bool) -> dict:
+        soup = BeautifulSoup(html, "html.parser")
+        information = []
+        for tr in soup.find_all("tr"):
+            tds = tr.find_all("td")
+            if tds:
+                val = tds[-1].text.strip()
+                if val:
+                    information.append(val)
+
+        return {
+            "email": information[0] if have_email else None,
+            "location": information[-1],
+        }
+
+    def login(self):
+        if not self.is_logged_in:
+            self.web_driver_wait_and_click(
+                by=By.CSS_SELECTOR,
+                value="#end ytd-button-renderer a",
+            )
+            self.web_driver_wait_and_send_inputs(
+                by=By.ID,
+                value="identifierId",
+                input_text="desaiparth974@gmail.com",
+            )
+
+            self.web_driver_wait_and_click(
+                by=By.CSS_SELECTOR,
+                value="#identifierNext button",
+            )
+
+            self.web_driver_wait_and_send_inputs(
+                by=By.NAME,
+                value="Passwd",
+                input_text="Parth@2000",
+            )
+
+            self.web_driver_wait_and_click(
+                by=By.CSS_SELECTOR,
+                value="#passwordNext button",
+            )
+
+            input("Press Enter key after authentication complete...")
+            self.is_logged_in = True
 
     @handle_exception
     @calc_time
-    def scrap(self, yt_channel_name):
-        """
-        Scrape videos from a YouTube channel.
+    def scrap(self, yt_channel_link):
+        print(f"Scraping link: {yt_channel_link}")
 
-        Args:
-            yt_channel_name (str): The name of the YouTube channel.
+        self.open_link(link=yt_channel_link)
 
-        """
-        link = f"{self.domain}/@{yt_channel_name}/videos"
-        link = f"{self.domain}/@{yt_channel_name}/videos"
+        if len(self.window_handles) > 1:
+            for window_handle in self.window_handles[:-1]:
+                self.switch_to.window(window_handle)
+                self.close()
 
-        print(f'Scraping link: {link}')
+        self.login()
 
-        # Open Youtube channel page
-        self.open_link(link=link)
+        details = self.extract_details()
 
-        # Scroll till end
-        self.scroll_till_end()
-
-        # Extract all links
-        print('Extracting links...')
-        video_links = self.extract_links()
-
-        print('Saving Links...')
-        self.save_links(video_links)
+        self.result[yt_channel_link] = details
+        print(f"Link {yt_channel_link} details: {details}")
 
 
-if __name__ == '__main__':
-    """
-    Entry point of the script.
+if __name__ == "__main__":
+    links = [
+        "https://www.youtube.com/@TradingLabOfficial",
+        "https://www.youtube.com/@cosdensolutions",
+        "https://www.youtube.com/@MikeShake",
+        "https://www.youtube.com/@TropicalMage-kn6se",
+        "https://www.youtube.com/@Fireship",
+        "https://www.youtube.com/@TechBurner",
+    ]
 
-    Scrapes videos from a specific YouTube channel.
+    youtube_details_scraper = YoutubeDetailsScraper()
 
-    Environment Variables:
-        YOUTUBE_API_KEY (str): The API key for accessing the YouTube Data API.
+    for link in links:
+        youtube_details_scraper.scrap(link)
 
-    Prints:
-        A completion message after the scraping process.
-
-    """
-
-    BASE_DIR = pathlib.Path(__file__).parent.resolve()
-    channel_name = 'thenewboston'
-
-    youtube_scraper = YoutubeScraper()
-    youtube_scraper.scrap(yt_channel_name=channel_name)
-    
-    print(f'{"#"*10} Completed {"#"*10}')
+    print(youtube_details_scraper.result)

@@ -1,5 +1,6 @@
-selenium==4.5.0
-webdriver_manager==3.8.4
+selenium
+webdriver_manager
 packaging==21.3
 utilmy==0.1.16667473
 beautifulsoup4==4.12.2
+undetected-chromedriver

@@ -1,54 +1,35 @@
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.wait import WebDriverWait
-from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.support.expected_conditions import (
+    element_to_be_clickable,
+    presence_of_element_located,
+)
+import undetected_chromedriver as uc
 
 
-class SeleniumWebDriver:
-    """
-    Wrapper class for initializing and managing a Selenium WebDriver instance.
+class SeleniumWebDriverManager:
+    wait = 10
 
-    Properties:
-        web_driver_wait (WebDriverWait): Returns a WebDriverWait instance with the specified wait time.
-        web_driver (webdriver.Chrome): Returns the Selenium WebDriver instance.
+    def get_options(self, headless: bool = False):
+        options = uc.ChromeOptions()
 
-    Attributes:
-        _driver: The internal reference to the Selenium WebDriver instance.
-        wait (int): The default wait time in seconds for WebDriverWait.
+        if headless:
+            options.add_argument("--headless")
+        else:
+            options.add_argument("--start-maximized")
 
-    """
-    def __init__(self):
-        self._driver = None
-        self.wait = 10
+        return options
 
     @property
     def web_driver_wait(self):
-        """
-        Returns a WebDriverWait instance with the specified wait time.
+        return WebDriverWait(self, self.wait)
 
-        Returns:
-            WebDriverWait: An instance of WebDriverWait.
+    def web_driver_wait_till_existence(self, by: str, value: str):
+        return self.web_driver_wait.until(presence_of_element_located((by, value)))
 
-        """
-        return WebDriverWait(self.web_driver, self.wait)
+    def web_driver_wait_and_click(self, by: str, value: str):
+        element = self.web_driver_wait.until(element_to_be_clickable((by, value)))
+        element.click()
 
-    @property
-    def web_driver(self) -> webdriver.Chrome:
-        """
-        Returns the Selenium WebDriver instance.
-
-        Returns:
-            webdriver.Chrome: The Selenium WebDriver instance.
-
-        """
-        if self._driver is not None:
-            return self._driver
-
-        options = webdriver.ChromeOptions()
-        options.add_argument("--headless=new")
-
-        self._driver = webdriver.Chrome(
-            service=Service(ChromeDriverManager().install()),
-            options=options
-        )
-        return self._driver
+    def web_driver_wait_and_send_inputs(self, by: str, value: str, input_text: str):
+        element = self.web_driver_wait.until(element_to_be_clickable((by, value)))
+        element.send_keys(input_text)
