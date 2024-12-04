@@ -3,7 +3,7 @@ It is a tool that takes the name of a YouTube channel as input and uses Selenium
 
 ## Install Virtual Environment
 
-Installing python pakages in virtual environment is recommended.
+Installing Python (3.11) pakages in virtual environment is recommended.
 
 Install [Python Virtual Environment](https://www.geeksforgeeks.org/creating-python-virtual-environment-windows-linux/)
 
@@ -21,6 +21,9 @@ After your virtual environment is activated, run command
 
 #### Note: To add channel name, open `scraper.py` file, scroll to the bottom of file and change value of variable
 
-    channel_name = 'CodeWithHarry' # Name of @channel
+    channels = [
+        "visualizersclub", 
+        "Skymography",
+    ] # Name of @channels
 
-After scraper run successfully, their will be file generated named `links.json` which contains all the videos link.
+After scraper run successfully, their will be files generated named at `output/<channels_name>_links.json` which contains all the videos link.

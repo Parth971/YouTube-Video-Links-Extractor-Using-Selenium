@@ -1,8 +1,9 @@
+from typing import Any, Callable
 from selenium.common import exceptions
 import time
 
 
-def calc_time(fun):
+def calc_time(fun: Callable[..., Any]) -> Callable[..., Any]:
     """
     Decorator function to calculate the execution time of a function.
 
@@ -13,11 +14,13 @@ def calc_time(fun):
         function: The decorated function.
 
     """
-    def inner(*args, **kwargs):
+
+    def inner(obj: object, *args: Any, **kwargs: Any) -> object:
         """
         Wrapper function that calculates the execution time of the decorated function.
 
         Args:
+            obj (object): The object instance.
             *args: Variable-length argument list.
             **kwargs: Arbitrary keyword arguments.
 
@@ -26,10 +29,10 @@ def calc_time(fun):
 
         """
         start_time = time.time()
-        result = fun(*args, **kwargs)
+        result = fun(obj, *args, **kwargs)
         end_time = time.time()
 
-        if hasattr(args[0], 'debug') and getattr(args[0], 'debug'):
+        if hasattr(obj, "debug") and getattr(obj, "debug") is True:
             print(f'{"#" * 10} Time take by {fun.__name__}: {end_time - start_time}\n')
 
         return result
@@ -37,7 +40,7 @@ def calc_time(fun):
     return inner
 
 
-def handle_exception(fun):
+def handle_exception(fun: Callable[..., Any]) -> Callable[..., Any]:
     """
     Decorator function to handle specific exceptions in a function.
 
@@ -48,18 +51,24 @@ def handle_exception(fun):
         function: The decorated function.
 
     """
-    def inner(*args, **kwargs):
+
+    def quit(obj: object) -> None:
+        if hasattr(obj, "web_driver"):
+            obj.web_driver.quit()
+
+    def inner(obj: object, *args: Any, **kwargs: Any) -> None:
         """
         Wrapper function that handles specific exceptions in the decorated function.
 
         Args:
+            obj (object): The object instance.
             *args: Variable-length argument list.
             **kwargs: Arbitrary keyword arguments.
 
         """
 
         try:
-            fun(*args, **kwargs)
+            fun(obj, *args, **kwargs)
         except exceptions.StaleElementReferenceException as e:
             """
             Exception handling for StaleElementReferenceException.
@@ -68,18 +77,13 @@ def handle_exception(fun):
                 e (exceptions.StaleElementReferenceException): The caught exception.
 
             """
-            print('\nError :: StaleElementReferenceException: ', e.msg)
+            print("\nError :: StaleElementReferenceException: ", e.msg)
+            quit(obj)
         except KeyboardInterrupt:
             """
             Exception handling for KeyboardInterrupt.
 
             """
-            pass
-        finally:
-            """
-            Cleanup operations.
-
-            """
-            args[0].web_driver.quit()
+            quit(obj)
 
     return inner
