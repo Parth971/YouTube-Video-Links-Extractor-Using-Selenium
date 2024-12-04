@@ -2,6 +2,8 @@ import contextlib
 from bs4 import BeautifulSoup
 from selenium.webdriver.common.by import By
 
+from twocaptcha import TwoCaptcha
+
 from undetected_chromedriver import Chrome
 
 from selenium_web_driver import SeleniumWebDriverManager
@@ -10,8 +12,11 @@ from utils import handle_exception, calc_time
 
 class YoutubeDetailsScraper(SeleniumWebDriverManager, Chrome):
     debug = True
+    data_sitekey = "6Lf39AMTAAAAALPbLZdcrWDa8Ygmgk_fmGmrlRog"
+    _2CAPTCHA_API_KEY = "e0203754234a625b5424a1594081f8b5"
 
     def __init__(self):
+        self.solver = TwoCaptcha(self._2CAPTCHA_API_KEY)
         super().__init__(options=self.get_options(headless=False))
         self.is_logged_in = False
         self.result = {}
@@ -40,9 +45,26 @@ class YoutubeDetailsScraper(SeleniumWebDriverManager, Chrome):
                 by=By.XPATH,
                 value="//iframe[@title='reCAPTCHA']",
             )
-            self.switch_to.frame(element)
-            self.web_driver_wait_and_click(by=By.ID, value="recaptcha-anchor")
-            self.switch_to.default_content()
+            captcha_page_url = element.get_attribute("src")
+            breakpoint()
+            try:
+                response = self.solver.recaptcha(
+                    sitekey=self.data_sitekey, url=captcha_page_url
+                )
+                code = response["code"]
+                print(code)
+
+                recaptcha_response_element = self.find_element(
+                    By.ID, "g-recaptcha-response"
+                )
+                self.execute_script(
+                    f'arguments[0].value = "{code}";', recaptcha_response_element
+                )
+            except Exception as e:
+                breakpoint()
+                print(e)
+                print("Captcha not solved")
+
             self.web_driver_wait_and_click(by=By.ID, value="submit-btn")
             have_email = True
 

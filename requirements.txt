@@ -1,6 +1,7 @@
 selenium
 webdriver_manager
-packaging==21.3
-utilmy==0.1.16667473
+# packaging
+# utilmy==0.1.16667473
 beautifulsoup4==4.12.2
 undetected-chromedriver
+2captcha-python
